@@ -21,4 +21,4 @@ jobs:
 
       - name: Trigger Render Deployment
         run: |
-          curl -X POST https://api.render.com/deploy/srv-XXXXXXXXXXXXXXXXXXXXXXXX
+          curl -X POST "${{ secrets.RENDER_DEPLOY_WEBHOOK }}"
