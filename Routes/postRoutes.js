@@ -4,8 +4,8 @@ const {
   getAllPosts,
   deletePost,
 } = require("../Controllers/postControllers");
-const { protect } = require("../Moddlewares/authMiddleware");
-const upload = require("../Moddlewares/uploadMiddleware");
+const { protect } = require("../Middlewares/authMiddleware");
+const upload = require("../Middlewares/uploadMiddleware");
 
 const router = express.Router();
 

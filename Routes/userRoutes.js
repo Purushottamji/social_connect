@@ -5,8 +5,8 @@ const {
   searchUsers,
   getUserProfile,
 } = require("../Controllers/userController");
-const { protect } = require("../Moddlewares/authMiddleware");
-const upload = require("../Moddlewares/uploadMiddleware");
+const { protect } = require("../Middlewares/authMiddleware");
+const upload = require("../Middlewares/uploadMiddleware");
 
 const router = express.Router();
 

@@ -10,14 +10,14 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     dialect: process.env.DB_DIALECT || "mysql",
     port: parseInt(process.env.DB_PORT) || 25433,
-    logging: false, // Set to console.log to see raw SQL queries in terminal
+    logging: false,
     timezone: "+05:30",
     dialectOptions: {
       dateStrings: true,
       typeCast: true,
-      connectTimeout: 60000, // 10 seconds connection timeout
+      connectTimeout: 60000,
       ssl: {
-        rejectUnauthorized: false, // For development only. In production, use proper SSL certificates.
+        rejectUnauthorized: false,
       },
     },
   },
@@ -32,10 +32,10 @@ const connectDB = async () => {
     //await sequelize.sync({ force: true });  // Force: true drops tables if they already exist or mysql indexes above 64 and re-creates them. Use with caution in production!
     //console.log("📦 All tables dropped and re-created successfully!");
     await sequelize.sync({ alter: true }); // Alter: true updates tables to match models without dropping them. Safer for development.
-    // console.log("📦 All models synchronized.");
+    console.log("📦 All models synchronized.");
   } catch (error) {
     console.error("Unable to connect to the database:", error);
-    process.exit(1); // Exit with failure code
+    process.exit(1);
   }
 };
 

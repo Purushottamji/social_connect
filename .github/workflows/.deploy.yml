@@ -1,0 +1,24 @@
+name: Node.js CI/CD Backend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci-cd-process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Trigger Render Deployment
+        run: |
+          curl -X POST https://api.render.com/deploy/srv-XXXXXXXXXXXXXXXXXXXXXXXX
