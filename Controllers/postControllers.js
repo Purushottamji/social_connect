@@ -1,5 +1,5 @@
 const { Post, User, Follower, Like } = require("../Models");
-const { sequelize } = require("../config/");
+const { sequelize } = require("../config/db");
 const { Op } = require("sequelize");
 const cloudinary = require("../config/cloudinary");
 
