@@ -1,4 +1,4 @@
-name: Node.js CI/CD Backend
+name: Render CI-CD Backend
 
 on:
   push:
@@ -7,18 +7,23 @@ on:
 jobs:
   ci-cd-process:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # Latest v4 यूज़ करें
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
+      # Latest v4 यूज़ करें और Node.js 20 या 22 सेट करें
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20.x"
 
-      - name: Install dependencies
+      # पैकेजेस इनस्टॉल करें (Clean Install के लिए npm ci या npm i)
+      - name: Install Dependencies
         run: npm install
 
+      # 🚀 रेंडर वेबहुक ट्रिगर
       - name: Trigger Render Deployment
         run: |
-          curl -X POST "${{ secrets.RENDER_DEPLOY_WEBHOOK }}"
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
