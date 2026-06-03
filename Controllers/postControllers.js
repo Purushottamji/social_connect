@@ -1,5 +1,5 @@
 const { Post, User, Follower, Like } = require("../Models");
-const { sequelize } = require("../config/db");
+const { sequelize } = require("../config/");
 const { Op } = require("sequelize");
 const cloudinary = require("../config/cloudinary");
 
@@ -9,11 +9,9 @@ exports.createPost = async (req, res) => {
     let mediaUrl = null;
     let mediaType = "text";
 
-    // चेक करें कि क्या यूजर ने कोई फाइल भेजी है?
     if (req.file) {
       const isVideo = req.file.mimetype.startsWith("video");
 
-      // Cloudinary पर अपलोड करें (अगर वीडियो है तो resource_type: 'video' देना ज़रूरी है)
       const uploadResult = await cloudinary.uploader.upload(req.file.path, {
         resource_type: isVideo ? "video" : "image",
         folder: "social_media_posts", // क्लाउड पर फोल्डर का नाम
@@ -41,18 +39,21 @@ exports.getAllPosts = async (req, res) => {
   try {
     const myId = req.user.id;
 
+    // 1. Pagination Parameters सेट करें
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    // 2. उन सब यूजर्स की IDs निकालें जिन्हें मैं फॉलो करता हूँ
     const followingUsers = await Follower.findAll({
       where: { followerId: myId },
       attributes: ["followingId"],
     });
 
     const followingIds = followingUsers.map((f) => f.followingId);
-    followingIds.push(myId);
+    followingIds.push(myId); // खुद की ID जोड़ी
 
+    // 3. सिर्फ़ इन IDs वाले पोस्ट्स डेटाबेस से निकालें (Subqueries के साथ)
     const { count, rows: posts } = await Post.findAndCountAll({
       where: {
         userId: {
@@ -65,9 +66,10 @@ exports.getAllPosts = async (req, res) => {
           attributes: ["id", "username", "profilePic"],
         },
       ],
-
+      // 👈 2. Subqueries की मदद से real-time counts और like status निकाल रहे हैं
       attributes: {
         include: [
+          // Total Likes Count निकालने के लिए
           [
             sequelize.literal(`(
               SELECT COUNT(*)
@@ -76,7 +78,7 @@ exports.getAllPosts = async (req, res) => {
             )`),
             "likesCount",
           ],
-
+          // Total Comments Count निकालने के लिए (ताकि आगे काम आए)
           [
             sequelize.literal(`(
               SELECT COUNT(*)
@@ -124,6 +126,9 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
+// @desc    Delete a post
+// @route   DELETE /api/posts/:id
+// @access  Private
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findByPk(req.params.id);
