@@ -1,10 +1,8 @@
-const { Post, User, Follower } = require("../Models");
-const { Op } = require("sequelize"); // Sequelize operators (queries के लिए)
-const cloudinary = require("../config/cloudinary"); // Cloudinary config for media uploads
+const { Post, User, Follower, Like } = require("../Models");
+const { sequelize } = require("../config/db");
+const { Op } = require("sequelize");
+const cloudinary = require("../config/cloudinary");
 
-// @desc    Create a new post
-// @route   POST /api/posts
-// @access  Private
 exports.createPost = async (req, res) => {
   try {
     const { content } = req.body;
@@ -39,55 +37,26 @@ exports.createPost = async (req, res) => {
   }
 };
 
-// @desc    Get Personalized Timeline Feed with Pagination
-// @route   GET /api/posts
-// @access  Private (लॉगिन होना ज़रूरी है ताकि हम सही फीड दिखा सकें)
-// exports.getAllPosts = async (req, res) => {
-//   try {
-//     // Fetch all posts and automatically include User info (JOIN query)
-//     const posts = await Post.findAll({
-//       include: [
-//         {
-//           model: User,
-//           attributes: ["id", "username", "profilePic"], // सिर्फ काम का डेटा लेंगे, पासवर्ड नहीं!
-//         },
-//       ],
-//       order: [["createdAt", "DESC"]], // नई पोस्ट्स सबसे ऊपर दिखेंगी
-//     });
-
-//     res.status(200).json({ success: true, count: posts.length, data: posts });
-//   } catch (error) {
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// };
-
 exports.getAllPosts = async (req, res) => {
   try {
     const myId = req.user.id;
 
-    // 1. Pagination Parameters सेट करें (Query params से या default)
-    const page = parseInt(req.query.page) || 1; // डिफ़ॉल्ट पहला पेज
-    const limit = parseInt(req.query.limit) || 10; // डिफ़ॉल्ट एक बार में 10 पोस्ट्स
-    const offset = (page - 1) * limit; // कितने पोस्ट्स छोड़कर आगे बढ़ना है
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    // 2. उन सब यूजर्स की IDs निकालें जिन्हें मैं फॉलो करता हूँ
     const followingUsers = await Follower.findAll({
       where: { followerId: myId },
       attributes: ["followingId"],
     });
 
-    // IDs को एक एरे (Array) में कंवर्ट करें: [id1, id2, id3...]
     const followingIds = followingUsers.map((f) => f.followingId);
-
-    // अपने खुद के पोस्ट्स भी फीड में दिखाने के लिए अपनी ID जोड़ें
     followingIds.push(myId);
 
-    // 3. सिर्फ़ इन IDs वाले पोस्ट्स डेटाबेस से निकालें (Pagination के साथ)
-    // findAndCountAll हमें डेटा के साथ-साथ टोटल काउंट भी देता है
     const { count, rows: posts } = await Post.findAndCountAll({
       where: {
         userId: {
-          [Op.in]: followingIds, // SQL: WHERE userId IN (id1, id2...)
+          [Op.in]: followingIds,
         },
       },
       include: [
@@ -96,29 +65,65 @@ exports.getAllPosts = async (req, res) => {
           attributes: ["id", "username", "profilePic"],
         },
       ],
-      order: [["createdAt", "DESC"]], // लेटेस्ट पोस्ट्स पहले
+
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM Likes AS l
+              WHERE l.postId = Post.id
+            )`),
+            "likesCount",
+          ],
+
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM Comments AS c
+              WHERE c.postId = Post.id
+            )`),
+            "commentsCount",
+          ],
+          // 🔥 सबसे ज़रूरी: क्या Logged-in user ने इस पोस्ट को लाइक किया है?
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM Likes AS l
+              WHERE l.postId = Post.id AND l.userId = ${myId}
+            )`),
+            "isLikedRaw",
+          ],
+        ],
+      },
+      order: [["createdAt", "DESC"]],
       limit: limit,
       offset: offset,
     });
 
-    // 4. रिस्पॉन्स में Pagination की डिटेल्स भी भेजें ताकि फ्रंटएंड (Flutter/React) को पता रहे अगला पेज है या नहीं
+    // 👈 3. Raw count (0 या 1) को true/false (Boolean) में कंवर्ट करना
+    const formattedPosts = posts.map((post) => {
+      const postJson = post.toJSON();
+      postJson.isLiked = postJson.isLikedRaw > 0; // अगर count 0 से बड़ा है तो true, वरना false
+      delete postJson.isLikedRaw; // Faltu temporary key हटा दी
+      return postJson;
+    });
+
+    // 4. रिस्पॉन्स में Pagination की डिटेल्स और Formatted data भेजें
     res.status(200).json({
       success: true,
       totalPosts: count,
       currentPage: page,
       totalPages: Math.ceil(count / limit),
       hasMore: page < Math.ceil(count / limit),
-      count: posts.length,
-      data: posts,
+      count: formattedPosts.length,
+      data: formattedPosts, // 👈 4. posts की जगह formattedPosts भेजा
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
-// @desc    Delete a post
-// @route   DELETE /api/posts/:id
-// @access  Private
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findByPk(req.params.id);

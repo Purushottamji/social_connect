@@ -26,10 +26,10 @@ exports.getPostComments = async (req, res) => {
   try {
     const comments = await Comment.findAll({
       where: { postId: req.params.postId },
-      include: [{ model: User, attributes: ["username", "profilePic"] }],
+      include: [{ model: User, attributes: ["id", "username", "profilePic"] }],
       order: [["createdAt", "DESC"]],
     });
-    res.status(200).json({ success: true, data: comments });
+    res.status(200).json({ success: true, comments: comments });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
