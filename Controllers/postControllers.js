@@ -39,21 +39,18 @@ exports.getAllPosts = async (req, res) => {
   try {
     const myId = req.user.id;
 
-    // 1. Pagination Parameters सेट करें
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // 2. उन सब यूजर्स की IDs निकालें जिन्हें मैं फॉलो करता हूँ
     const followingUsers = await Follower.findAll({
       where: { followerId: myId },
       attributes: ["followingId"],
     });
 
     const followingIds = followingUsers.map((f) => f.followingId);
-    followingIds.push(myId); // खुद की ID जोड़ी
+    followingIds.push(myId);
 
-    // 3. सिर्फ़ इन IDs वाले पोस्ट्स डेटाबेस से निकालें (Subqueries के साथ)
     const { count, rows: posts } = await Post.findAndCountAll({
       where: {
         userId: {
@@ -66,34 +63,30 @@ exports.getAllPosts = async (req, res) => {
           attributes: ["id", "username", "profilePic"],
         },
       ],
-      // 👈 2. Subqueries की मदद से real-time counts और like status निकाल रहे हैं
       attributes: {
         include: [
-          // Total Likes Count निकालने के लिए
           [
             sequelize.literal(`(
-              SELECT COUNT(*)
-              FROM Likes AS l
-              WHERE l.postId = Post.id
-            )`),
+          SELECT COUNT(*)
+          FROM Likes AS l
+          WHERE l.postId = Post.id
+        )`),
             "likesCount",
           ],
-          // Total Comments Count निकालने के लिए (ताकि आगे काम आए)
           [
             sequelize.literal(`(
-              SELECT COUNT(*)
-              FROM Comments AS c
-              WHERE c.postId = Post.id
-            )`),
+          SELECT COUNT(*)
+          FROM Comments AS c
+          WHERE c.postId = Post.id
+        )`),
             "commentsCount",
           ],
-          // 🔥 सबसे ज़रूरी: क्या Logged-in user ने इस पोस्ट को लाइक किया है?
           [
             sequelize.literal(`(
-              SELECT COUNT(*)
-              FROM Likes AS l
-              WHERE l.postId = Post.id AND l.userId = ${myId}
-            )`),
+          SELECT COUNT(*)
+          FROM Likes AS l
+          WHERE l.postId = Post.id AND l.userId = '${myId}'
+        )`),
             "isLikedRaw",
           ],
         ],
@@ -103,15 +96,13 @@ exports.getAllPosts = async (req, res) => {
       offset: offset,
     });
 
-    // 👈 3. Raw count (0 या 1) को true/false (Boolean) में कंवर्ट करना
     const formattedPosts = posts.map((post) => {
       const postJson = post.toJSON();
-      postJson.isLiked = postJson.isLikedRaw > 0; // अगर count 0 से बड़ा है तो true, वरना false
-      delete postJson.isLikedRaw; // Faltu temporary key हटा दी
+      postJson.isLiked = postJson.isLikedRaw > 0;
+      delete postJson.isLikedRaw;
       return postJson;
     });
 
-    // 4. रिस्पॉन्स में Pagination की डिटेल्स और Formatted data भेजें
     res.status(200).json({
       success: true,
       totalPosts: count,
